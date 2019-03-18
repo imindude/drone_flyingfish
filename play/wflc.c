@@ -13,7 +13,7 @@
 
 /* ****************************************************************************************************************** */
 
-#define WFLC_N_MARMONICS        2
+#define WFLC_N_HARMONICS        2
 
 enum
 {
@@ -27,7 +27,7 @@ typedef struct _LocalData
     float   mu0_;       // μ0: adaptive gain for fundamental frequency
     float   mu1_;       // μ1: adaptive gain for reference input vector
     float   omega0_;    // ω0: fundamental angular frequency
-    float   wv_[_Vector_N][WFLC_N_MARMONICS];   // weight vector, 1st row for sin and 2nd row for cos
+    float   wv_[_Vector_N][WFLC_N_HARMONICS];   // weight vector, 1st row for sin and 2nd row for cos
 }
 LocalData;
 
@@ -55,7 +55,7 @@ void wflc_reset(WflcHandle h, float omega0)
 
     this->omega0_ = omega0;
 
-    for (int8_t i = 0; i < WFLC_N_MARMONICS; i++) {
+    for (int8_t i = 0; i < WFLC_N_HARMONICS; i++) {
 
         this->wv_[_Vector_Sin][i] = 0.0f;
         this->wv_[_Vector_Cos][i] = 0.0f;
@@ -67,32 +67,32 @@ float wflc_update(WflcHandle h, float x, float dt)
     LocalData   *this = (LocalData*)h;
     int8_t  i;
     float   err, y = 0.0f, z = 0.0f;
-    float   af[WFLC_N_MARMONICS];               // array of angular frequencies
-    float   iv[_Vector_N][WFLC_N_MARMONICS];    // reference input vector, 1st row for sin and 2nd row for cos
+    float   af[WFLC_N_HARMONICS];               // array of angular frequencies
+    float   iv[_Vector_N][WFLC_N_HARMONICS];    // reference input vector, 1st row for sin and 2nd row for cos
 
     // Get angular velocities depending on adjusted fundamental angular frequency
-    for (i = 0; i < WFLC_N_MARMONICS; i++)
+    for (i = 0; i < WFLC_N_HARMONICS; i++)
         af[i] = (i + 1) * this->omega0_;        // assign ω0 and its harmonics
 
     // find reference input vector
-    for (i = 0; i < WFLC_N_MARMONICS; i++) {
+    for (i = 0; i < WFLC_N_HARMONICS; i++) {
 
         iv[_Vector_Sin][i] = sinf(af[i] * dt);
-        iv[_Vector_Cos][i] = sinf(af[i] * dt);
+        iv[_Vector_Cos][i] = cosf(af[i] * dt);
     }
 
     // find estimated signal, y
-    for (i = 0; i < WFLC_N_MARMONICS; i++)
+    for (i = 0; i < WFLC_N_HARMONICS; i++)
         y += this->wv_[_Vector_Sin][i] * iv[_Vector_Sin][i] + this->wv_[_Vector_Cos][i] * iv[_Vector_Cos][i];
 
     // adapt the weights
     err = x - y;
-    for (i = 0; i < WFLC_N_MARMONICS; i++)
+    for (i = 0; i < WFLC_N_HARMONICS; i++)
         z += (i + 1) * (this->wv_[_Vector_Sin][i] * iv[_Vector_Cos][i] - this->wv_[_Vector_Cos][i] * iv[_Vector_Sin][i]);
 
-    this->omega0_ = this->omega0_ + 2.0f * this->mu0_ * err * z;
+    this->omega0_ += 2.0f * this->mu0_ * err * z;
 
-    for (i = 0; i < WFLC_N_MARMONICS; i++) {
+    for (i = 0; i < WFLC_N_HARMONICS; i++) {
 
         this->wv_[_Vector_Sin][i] += 2.0f * this->mu1_ * iv[_Vector_Sin][i] * err;
         this->wv_[_Vector_Cos][i] += 2.0f * this->mu1_ * iv[_Vector_Cos][i] * err;
